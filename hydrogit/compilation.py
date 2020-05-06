@@ -173,16 +173,20 @@ endforeach(_target ${{_allTargets}})
                 try:
                     print(f'{self.version}: Building target {target}...', end='', flush=True)
                     
-                    build_proc = subprocess.run(args=[
+                    args = [
                         'cmake',
                         '--build',
                         str(self.build_path),
                         '--target', target,
-                        # '--verbose' # Uncomment to show Make output
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True)
+                    ]
+                    if verbose:
+                        args.append('--verbose') # show make output
+                        
+                    build_proc = subprocess.run(
+                        args=args,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True)
                     
                     if verbose:
                         print(build_proc.stdout)
