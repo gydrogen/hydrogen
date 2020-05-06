@@ -37,16 +37,21 @@ class HydrogenAdapter:
         build_target_bc = self.select_target(versions)
 
         # Run Hydrogen
-        args=[]
+        bcs=[]
+        sources=[]
         for version in versions:
-            build_target = next(bc for bc in version.bc_paths if bc.stem == build_target_bc)
-            args.append(build_target)
-        for version in versions:
-            args.append("::")
-            for c_path in version.c_paths:
-                args.append(c_path)
+            try:
+                bc = next(bc for bc in version.bc_paths if bc.stem == build_target_bc)
+            except StopIteration:
+                # Only build the versions that have the specified target
+                continue
 
-        cmd = [str(self.hy)] + [str(arg) for arg in args]
+            bcs.append(bc)
+            sources.append("::")
+            for c_path in version.c_paths:
+                sources.append(c_path)
+
+        cmd = [str(self.hy)] + list(map(str, bcs)) + list(map(str, sources))
         print(f'running command {cmd}')
 
         subprocess.run(cmd)
