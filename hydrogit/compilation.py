@@ -30,9 +30,10 @@ class CompileManager:
         self.versions_built.append(ver)
 
 class Version:
-    def __init__(self, path, language):
-        self.path=path
-        self.build_path = self.path / 'build'
+    def __init__(self, root, language):
+        self.root=root
+        self.build_path = self.root / 'build'
+        self.llvm_ir_path = self.build_path / 'llvm-ir'
         self.c_paths=[]
         self.bc_path=None
         self.language = language
@@ -42,7 +43,8 @@ class Version:
         self.setup_build_path(force)
 
         # Transform CMakeLists.txt
-        root_cmakelist = self.path / 'CMakeLists.txt'
+        root_cmakelist = self.root / 'CMakeLists.txt'
+        assert root_cmakelist.exists(), 'CMakeLists.txt not found in project root'
         self.transform_cmakelists(root_cmakelist)
 
         # Run CMake and collect the output
@@ -55,7 +57,7 @@ class Version:
             if force:
                 shutil.rmtree(self.build_path)
             else:
-                print(f'Version {self.path} is already built, skipping')
+                print(f'Version {self.root} is already built, skipping')
                 return
 
         self.build_path.mkdir(exist_ok=True)
@@ -66,33 +68,36 @@ class Version:
         '''
         # gather C sources
         if self.language == 'C':
-            for p in (self.path).glob('*.c'):
+            for p in (self.root).glob('*.c'):
                 self.c_paths.append(p)
-            for p in (self.path / 'src').glob('**/*.c'):
+            for p in (self.root / 'src').glob('**/*.c'):
                 self.c_paths.append(p)
         
         # gather C++ sources
         elif self.language == 'CXX':
-            for p in (self.path).glob('*.cpp'):
+            for p in (self.root).glob('*.cpp'):
                 self.c_paths.append(p)
-            for p in (self.path / 'src').glob('**/*.cpp'):
+            for p in (self.root / 'src').glob('**/*.cpp'):
                 self.c_paths.append(p)
                 
-        assert len(self.c_paths) > 0
+        assert len(self.c_paths) > 0, \
+            f'No {self.language} sources found'
 
         # gather compiled bytecode
         # todo: make it get all bc's
-        self.bc_paths = list((self.build_path / 'llvm-ir').glob(f'**/*{hydrogit_target_tag}.bc'))
-        assert len(self.bc_paths) > 0
+        self.bc_paths = list(self.llvm_ir_path.glob(f'**/*{hydrogit_target_tag}.bc'))
+        assert len(self.bc_paths) > 0, \
+            f'CMake output not found in path {str(self.llvm_ir_path)}'
 
-    def transform_cmakelists(self, path):
+    def transform_cmakelists(self, cmakelists):
         '''
         Transform given CMakeLists.txt and return the llvmlink target name
         '''
 
-        assert path.exists()
+        assert cmakelists.exists(), \
+            f'CMakeLists.txt not found at path {str(cmakelists)}'
 
-        with path.open('a') as file:        
+        with cmakelists.open('a') as file:        
             ir_gen = f'''
 #{'='*10}LLVM IR generation
 list(APPEND CMAKE_MODULE_PATH "{cmake_utils_dir}")
@@ -130,15 +135,18 @@ endforeach(_target ${{_allTargets}})
         subprocess.run(args=[
             'cmake',
             '-B', str(self.build_path),
-            str(self.path)
+            str(self.root)
         ], env=compile_env)
 
-        llvm_ir_path = self.build_path / 'llvm-ir'
-        assert(llvm_ir_path.exists())
+        assert self.llvm_ir_path.exists(), \
+            f'LLVM IR output directory {str(self.llvm_ir_path)} does not exist'
 
-        target_bcs = list(llvm_ir_path.glob(f'*{hydrogit_target_tag}'))
-        assert(bc.exists() for bc in target_bcs)
-        assert(len(target_bcs) > 0)
+        target_bcs = list(self.llvm_ir_path.glob(f'*{hydrogit_target_tag}'))
+        assert len(target_bcs) > 0, \
+            f'No CMake output found in path {str(self.llvm_ir_path)}'
+        for bc in target_bcs:
+            assert bc.exists(), \
+                f'CMake output not found for LLVM IR target {bc}'
 
         for bc in target_bcs:
             target = bc.stem
