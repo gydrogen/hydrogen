@@ -15,7 +15,7 @@ class CompileManager:
         self.tmp=tmp
         self.versions_built=[]
 
-    def build_all(self, force):
+    def build_all(self, force, verbose):
         '''
         Run compilation step for all versions.
         '''
@@ -24,7 +24,7 @@ class CompileManager:
             if version_path.is_dir() and version_path.name!="cloned":
                 ver=Version(version_path, self.language)
                 try:
-                    ver.build(force)
+                    ver.build(force, verbose)
                 except AssertionError as msg:
                     print(f'{ver.version}: Failed - Skipping ({msg})')
                     continue
@@ -42,7 +42,7 @@ class Version:
         self.bc_paths=[]
         self.language = language
     
-    def build(self, force):
+    def build(self, force, verbose):
         # Set up build path
         self.setup_build_path(force)
 
@@ -53,9 +53,9 @@ class Version:
 
         # Run CMake and collect the output
         print(f'{self.version}: Running CMake...')
-        targets = self.cmake()
+        targets = self.cmake(verbose)
         print(f'{self.version}: Building...')
-        self.make(targets)
+        self.make(targets, verbose)
         print(f'{self.version}: Gathering files...')
         self.glob_files()
 
@@ -129,7 +129,7 @@ endforeach(_target ${{_allTargets}})
 
             file.write(ir_gen)
 
-    def cmake(self):
+    def cmake(self, verbose):
         '''
         Run CMake with the given target
         '''
@@ -139,15 +139,22 @@ endforeach(_target ${{_allTargets}})
             compile_env['CC'] = 'clang'
         elif self.language == 'CXX':
             compile_env['CXX'] = 'clang++'
+        
         cmake_proc = subprocess.run(args=[
             'cmake',
             '-B', str(self.build_path),
             str(self.root)
         ],
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
         env=compile_env)
+            
+        if verbose:
+            print(cmake_proc.stdout)
         
-        assert False, f'CMake step returned error code {cmake_proc.returncode}'
+        assert cmake_proc.returncode == 0, \
+            f'CMake step returned error code {cmake_proc.returncode}'
         assert self.llvm_ir_path.exists(), \
             f'LLVM IR output directory {str(self.llvm_ir_path)} does not exist'
 
@@ -161,24 +168,37 @@ endforeach(_target ${{_allTargets}})
         targets = [bc.stem for bc in target_bcs]
         return targets
 
-    def make(self, targets):
-        for target in targets:
-            print(f'{self.version}: target {target}')
-            build_proc = subprocess.run(args=[
-                'cmake',
-                '--build',
-                str(self.build_path),
-                '--target', target,
-                # '--verbose' # Uncomment to show Make output
-            ],
-            capture_output=True)
-            
-            assert build_proc.returncode == 0, \
-                f'Build step returned error code {build_proc.returncode}'
+    def make(self, targets, verbose):
+            for target in targets:
+                try:
+                    print(f'{self.version}: Building target {target}...', end='', flush=True)
+                    
+                    build_proc = subprocess.run(args=[
+                        'cmake',
+                        '--build',
+                        str(self.build_path),
+                        '--target', target,
+                        # '--verbose' # Uncomment to show Make output
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True)
+                    
+                    if verbose:
+                        print(build_proc.stdout)
+
+                    assert build_proc.returncode == 0, \
+                        f'Build step returned error code {build_proc.returncode}'
+                    
+                    print('done')
+                except Exception as ex:
+                    # Print the newline & bubble if there's an error while processing
+                    print()
+                    raise ex
 
 def main():
     cm=CompileManager('C', Path("./tmp").absolute())
-    cm.build_all(True)
+    cm.build_all(True, True)
 
 if __name__ == '__main__':
     main()

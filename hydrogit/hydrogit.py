@@ -20,14 +20,14 @@ class HydroGit:
         self.git_manager.clone(force)
         self.git_manager.checkout_copy_versions(self.git_commits)
 
-    def compile(self, force_build):
+    def compile(self, force_build, verbose):
         # compilation
-        self.compiler.build_all(force_build)
+        self.compiler.build_all(force_build, verbose)
 
     def hydrogen(self):
         self.hydrogen_manager.run(self.compiler.versions_built)
 
-def run(url, commit_ids, force_pull, force_build, language):
+def run(url, commit_ids, force_pull, force_build, language, verbose):
     # setup
     hg=HydroGit(url, commit_ids, language)
 
@@ -35,7 +35,7 @@ def run(url, commit_ids, force_pull, force_build, language):
     hg.clone(force_pull)
 
     # fake compilation
-    hg.compile(force_build)
+    hg.compile(force_build, verbose)
 
     # hydrogen
     hg.hydrogen()
@@ -49,6 +49,7 @@ if __name__ == '__main__':
     force_pull = args.force_pull
     force_build = args.force_build
     language = args.language
+    verbose = args.verbose
 
     # git_url="https://github.com/feddischson/include_gardener.git"
     # commit_ids = ["093ab9c1126c6f946e4183dcf02d8cdff837337b", "90539a60dd83a6f0a30ecbb2ddfa3eeac529e975"]
@@ -57,4 +58,4 @@ if __name__ == '__main__':
     # commit_ids = ["5e8651df381079d0347ddfa254f554972611d1a0", "70d03532975252bd9982beba60a8720e11ec8f02", "9cde7197d0a3fe0caf7ee0ec7fd291e19ccc18ed"]
     # language='C'
 
-    run(git_url, commit_ids, force_pull, force_build, language)
+    run(git_url, commit_ids, force_pull, force_build, language, verbose)
