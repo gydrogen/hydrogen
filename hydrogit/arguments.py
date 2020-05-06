@@ -20,6 +20,7 @@ def get_args():
         '-p',
         '--force-pull',
         dest='force_pull',
+        action='store_true',
         help='remove existing versions and pull again',
         default=False,
         )
@@ -28,7 +29,17 @@ def get_args():
         '-b',
         '--force-build',
         dest='force_build',
+        action='store_true',
         help='remove existing versions and build again',
+        default=False,
+        )
+
+    parser.add_argument(
+        '-v',
+        '--verbose',
+        dest='verbose',
+        action='store_true',
+        help='show CMake output',
         default=False,
         )
         
