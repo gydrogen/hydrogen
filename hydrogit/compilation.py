@@ -7,6 +7,7 @@ import shutil
 
 cmake_utils_dir = (Path(__file__).parent / 'llvm-ir-cmake-utils' / 'cmake').resolve()
 assert cmake_utils_dir.exists()
+hydrogit_target_tag = '_hydrogit_llvm_link'
 
 class CompileManager:
     def __init__(self, language, tmp):
@@ -81,8 +82,8 @@ class Version:
 
         # gather compiled bytecode
         # todo: make it get all bc's
-        self.bc_path = next((self.build_path / 'llvm-ir').glob('**/*_hydrogit_llvm_link.bc'))
-        assert self.bc_path
+        self.bc_paths = list((self.build_path / 'llvm-ir').glob(f'**/*{hydrogit_target_tag}.bc'))
+        assert len(self.bc_paths) > 0
 
     def transform_cmakelists(self, path):
         '''
@@ -100,13 +101,14 @@ enable_language(C)
 get_directory_property(_allTargets BUILDSYSTEM_TARGETS)
 foreach(_target ${{_allTargets}})
     get_target_property(_type ${{_target}} TYPE)
-    if(_type STREQUAL "EXECUTABLE")
+    message(STATUS "Hydrogit saw target ${{_target}} type ${{_type}}")
+    if((_type STREQUAL "EXECUTABLE") OR (_type STREQUAL "STATIC_LIBRARY"))
         message(STATUS "Hydrogit adding IR for target ${{_target}} type ${{_type}}")
         set_target_properties(${{_target}} PROPERTIES LINKER_LANGUAGE C)
         add_compile_options(-c -O0 -Xclang -disable-O0-optnone -g -emit-llvm -S)
         llvmir_attach_bc_target(${{_target}}_bc ${{_target}})
         add_dependencies(${{_target}}_bc ${{_target}})
-        llvmir_attach_link_target(${{_target}}_hydrogit_llvm_link ${{_target}}_bc -S)
+        llvmir_attach_link_target(${{_target}}{hydrogit_target_tag} ${{_target}}_bc -S)
     endif()
 endforeach(_target ${{_allTargets}})
 # end LLVM IR generation
@@ -134,7 +136,7 @@ endforeach(_target ${{_allTargets}})
         llvm_ir_path = self.build_path / 'llvm-ir'
         assert(llvm_ir_path.exists())
 
-        target_bcs = list(llvm_ir_path.glob('*_hydrogit_llvm_link'))
+        target_bcs = list(llvm_ir_path.glob(f'*{hydrogit_target_tag}'))
         assert(bc.exists() for bc in target_bcs)
         assert(len(target_bcs) > 0)
 
