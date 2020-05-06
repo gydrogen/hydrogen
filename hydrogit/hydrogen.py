@@ -7,12 +7,10 @@ class HydrogenAdapter:
         self.hy=hydrogen_binary
         assert self.hy.exists()
 
-    def run(self, versions):
+    def select_target(self, versions):
         '''
-        Run Hydrogen on these versions
+        Select target to build
         '''
-
-        # Select version
         bcs = [bc for v in versions for bc in v.bc_paths]
         target_names_unique = set([bc.stem.replace(hydrogit_target_tag, '') for bc in bcs])
         target_names = sorted(list(target_names_unique))
@@ -29,7 +27,14 @@ class HydrogenAdapter:
             build_target = target_names[selection_no - 1]
         else:
             build_target = target_names[0]
-        build_target_bc = f'{build_target}{hydrogit_target_tag}'
+        return f'{build_target}{hydrogit_target_tag}'
+
+    def run(self, versions):
+        '''
+        Run Hydrogen on these versions
+        '''
+
+        build_target_bc = self.select_target(versions)
 
         # Run Hydrogen
         args=[]
