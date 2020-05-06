@@ -18,11 +18,7 @@ class HydrogenAdapter:
             print(f'{len(target_names)} targets found:')
             print(' '.join(f'''{i}) {name}''' for i, name in enumerate(target_names, start=1)))
 
-            try:
-                selection_no = int(input(f'''Select a target to build(1-{len(target_names)}):'''))
-            except KeyboardInterrupt:
-                print()
-                return
+            selection_no = int(input(f'''Select a target to build(1-{len(target_names)}):'''))
 
             build_target = target_names[selection_no - 1]
         else:
@@ -33,6 +29,10 @@ class HydrogenAdapter:
         '''
         Run Hydrogen on these versions
         '''
+
+        if not any(versions):
+            print('Nothing to build :(')
+            return
 
         build_target_bc = self.select_target(versions)
 

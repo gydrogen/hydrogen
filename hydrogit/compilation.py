@@ -7,7 +7,7 @@ import shutil
 
 cmake_utils_dir = (Path(__file__).parent / 'llvm-ir-cmake-utils' / 'cmake').resolve()
 assert cmake_utils_dir.exists()
-hydrogit_target_tag = '_hydrogit_llvm_link'
+hydrogit_target_tag = '_hydrogit'
 
 class CompileManager:
     def __init__(self, language, tmp):
@@ -22,20 +22,24 @@ class CompileManager:
 
         for version_path in Path(self.tmp).iterdir():
             if version_path.is_dir() and version_path.name!="cloned":
-                self.build_one(version_path, force)
+                ver=Version(version_path, self.language)
+                try:
+                    ver.build(force)
+                except AssertionError as msg:
+                    print(f'{ver.version}: Failed - Skipping ({msg})')
+                    continue
 
-    def build_one(self, version_path, force):
-        ver=Version(version_path, self.language)
-        ver.build(force)
-        self.versions_built.append(ver)
+                print(f'{ver.version}: Built successfully')
+                self.versions_built.append(ver)
 
 class Version:
     def __init__(self, root, language):
         self.root=root
+        self.version = self.root.stem
         self.build_path = self.root / 'build'
         self.llvm_ir_path = self.build_path / 'llvm-ir'
         self.c_paths=[]
-        self.bc_path=None
+        self.bc_paths=[]
         self.language = language
     
     def build(self, force):
@@ -48,7 +52,11 @@ class Version:
         self.transform_cmakelists(root_cmakelist)
 
         # Run CMake and collect the output
-        self.cmake()
+        print(f'{self.version}: Running CMake...')
+        targets = self.cmake()
+        print(f'{self.version}: Building...')
+        self.make(targets)
+        print(f'{self.version}: Gathering files...')
         self.glob_files()
 
     def setup_build_path(self, force):
@@ -80,13 +88,13 @@ class Version:
             for p in (self.root / 'src').glob('**/*.cpp'):
                 self.c_paths.append(p)
                 
-        assert len(self.c_paths) > 0, \
+        assert any(self.c_paths), \
             f'No {self.language} sources found'
 
         # gather compiled bytecode
         # todo: make it get all bc's
         self.bc_paths = list(self.llvm_ir_path.glob(f'**/*{hydrogit_target_tag}.bc'))
-        assert len(self.bc_paths) > 0, \
+        assert any(self.bc_paths), \
             f'CMake output not found in path {str(self.llvm_ir_path)}'
 
     def transform_cmakelists(self, cmakelists):
@@ -131,33 +139,42 @@ endforeach(_target ${{_allTargets}})
             compile_env['CC'] = 'clang'
         elif self.language == 'CXX':
             compile_env['CXX'] = 'clang++'
-
-        subprocess.run(args=[
+        cmake_proc = subprocess.run(args=[
             'cmake',
             '-B', str(self.build_path),
             str(self.root)
-        ], env=compile_env)
-
+        ],
+        capture_output=True,
+        env=compile_env)
+        
+        assert False, f'CMake step returned error code {cmake_proc.returncode}'
         assert self.llvm_ir_path.exists(), \
             f'LLVM IR output directory {str(self.llvm_ir_path)} does not exist'
 
         target_bcs = list(self.llvm_ir_path.glob(f'*{hydrogit_target_tag}'))
-        assert len(target_bcs) > 0, \
+        assert any(target_bcs), \
             f'No CMake output found in path {str(self.llvm_ir_path)}'
         for bc in target_bcs:
             assert bc.exists(), \
                 f'CMake output not found for LLVM IR target {bc}'
 
-        for bc in target_bcs:
-            target = bc.stem
-            print('building target', target)
-            subprocess.run(args=[
+        targets = [bc.stem for bc in target_bcs]
+        return targets
+
+    def make(self, targets):
+        for target in targets:
+            print(f'{self.version}: target {target}')
+            build_proc = subprocess.run(args=[
                 'cmake',
                 '--build',
                 str(self.build_path),
                 '--target', target,
                 # '--verbose' # Uncomment to show Make output
-            ], env=compile_env)
+            ],
+            capture_output=True)
+            
+            assert build_proc.returncode == 0, \
+                f'Build step returned error code {build_proc.returncode}'
 
 def main():
     cm=CompileManager('C', Path("./tmp").absolute())
