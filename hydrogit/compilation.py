@@ -15,7 +15,7 @@ class CompileManager:
         self.tmp=tmp
         self.versions_built=[]
 
-    def build_all(self, force, verbose, cmake_dir, build_dir):
+    def build_all(self, force, verbose, cmake_dir, build_dir, with_cmake = True):
         '''
         Run compilation step for all versions.
         '''
@@ -24,7 +24,10 @@ class CompileManager:
             if version_path.is_dir() and version_path.name!="cloned":
                 ver=Version(version_path, self.language, cmake_dir, build_dir)
                 try:
-                    ver.build(force, verbose)
+                    if with_cmake:
+                        ver.build_cmake(force, verbose)
+                    else:
+                        ver.build_make()
                 except Exception as msg:
                     print(f'{ver.version}: Error({msg}) - skipping')
                     continue
@@ -34,6 +37,7 @@ class CompileManager:
 
 class Version:
     def __init__(self, root, language, cmake_dir, build_dir):
+        assert root.exists()
         self.root=root
         self.version = self.root.stem
         self.build_path = self.root / build_dir
@@ -42,8 +46,27 @@ class Version:
         self.c_paths=[]
         self.bc_paths=[]
         self.language = language
+
+    def build_make(self):
+
+        subprocess.run(['bash', 'configure'], cwd=self.root)
+        subprocess.run(['make', 'clean'], cwd=self.root)
+        subprocess.run([
+            'make',
+            'CC=clang',
+            "CPPFLAGS=-c -O0 -Xclang -disable-O0-optnone -g -flto",
+            "LDFLAGS=-flto -fuse-ld=lld -Wl,-save-temps"
+        ], cwd=self.root)
+
+        # Invoke llvm-dis
+        filename = next(self.root.glob('*.precodegen.bc'))
+        subprocess.run([
+            'llvm-dis',
+            filename.name,
+            '-o', f'{filename.stem}{hydrogit_target_tag}.bc'
+        ], cwd=self.root)
     
-    def build(self, force, verbose):
+    def build_cmake(self, force, verbose):
         # Set up build path
         self.setup_build_path(force)
 
@@ -56,7 +79,7 @@ class Version:
         print(f'{self.version}: Running CMake...')
         targets = self.cmake(verbose)
         print(f'{self.version}: Building...')
-        self.make(targets, verbose)
+        self.make_cmake(targets, verbose)
         print(f'{self.version}: Gathering files...')
         self.glob_files()
 
@@ -170,7 +193,7 @@ endforeach(_target ${{_allTargets}})
         targets = [bc.stem for bc in target_bcs]
         return targets
 
-    def make(self, targets, verbose):
+    def make_cmake(self, targets, verbose):
         for target in targets:
             try:
                 print(f'{self.version}: Building target {target}...', end='', flush=True)
@@ -204,8 +227,8 @@ endforeach(_target ${{_allTargets}})
                 print(f'{self.version}: {target}: Error({ex}) - skipping')
 
 def main():
-    cm=CompileManager('C', Path("./tmp").absolute())
-    # cm.build_all(True, True)
+    v = Version(Path('./tmp/tut_prog'), 'C', '', '')
+    v.build_make()
 
 if __name__ == '__main__':
     main()
