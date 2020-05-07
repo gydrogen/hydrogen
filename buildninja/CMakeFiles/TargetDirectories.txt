@@ -1,0 +1,3 @@
+/home/hydrogen/buildninja/CMakeFiles/rebuild_cache.dir
+/home/hydrogen/buildninja/CMakeFiles/Hydrogen.out.dir
+/home/hydrogen/buildninja/CMakeFiles/edit_cache.dir

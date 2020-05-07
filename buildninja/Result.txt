@@ -1,0 +1,3 @@
+Input Args:
+/home/hydrogen/buildninja/Hydrogen.out  /home/hydrogen/TestPrograms/Buggy/ProgV1.bc  /home/hydrogen/TestPrograms/Buggy2/ProgV2.bc  ::  /home/hydrogen/TestPrograms/Buggy/Prog.c  ::  /home/hydrogen/TestPrograms/Buggy2/Prog.c  
+Finished Building MVICFG in 7ms

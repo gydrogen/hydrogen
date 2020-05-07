@@ -1,0 +1,69 @@
+Printing newly added paths
+===================================
+  %1 = alloca i32, align 4
+  %2 = alloca float, align 4
+  %3 = alloca float, align 4
+  %4 = alloca float, align 4
+  store i32 0, i32* %1, align 4
+  call void @llvm.dbg.declare(metadata float* %2, metadata !13, metadata !DIExpression()), !dbg !15
+  call void @llvm.dbg.declare(metadata float* %3, metadata !16, metadata !DIExpression()), !dbg !17
+  call void @llvm.dbg.declare(metadata float* %4, metadata !18, metadata !DIExpression()), !dbg !19
+  %5 = call i32 (i8*, ...) @__isoc99_scanf(i8* getelementptr inbounds ([6 x i8], [6 x i8]* @.str, i32 0, i32 0), float* %2, float* %3), !dbg !20
+  %6 = load float, float* %2, align 4, !dbg !21
+  %7 = load float, float* %3, align 4, !dbg !22
+  %8 = fmul float %6, %7, !dbg !23
+  %9 = fdiv float %8, 2.000000e+00, !dbg !24
+  store float %9, float* %4, align 4, !dbg !25
+  %10 = load float, float* %4, align 4, !dbg !26
+  %11 = fcmp ogt float %10, 0.000000e+00, !dbg !28
+  br i1 %11, label %12, label %24, !dbg !29
+  %16 = load float, float* %2, align 4, !dbg !31
+  %17 = fpext float %16 to double, !dbg !31
+  %18 = load float, float* %3, align 4, !dbg !32
+  %19 = fpext float %18 to double, !dbg !32
+  %20 = load float, float* %2, align 4, !dbg !33
+  %21 = fpext float %20 to double, !dbg !33
+  %22 = load float, float* %3, align 4, !dbg !34
+  %23 = fpext float %22 to double, !dbg !34
+  %24 = load float, float* %4, align 4, !dbg !35
+  %25 = fpext float %24 to double, !dbg !35
+  %26 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([55 x i8], [55 x i8]* @.str.1, i32 0, i32 0), double %17, double %19, double %21, double %23, double %25), !dbg !36
+  br label %40, !dbg !36
+  br label %37, !dbg !37
+  ret i32 0, !dbg !44
+Exit::main
+===================================
+===================================
+  %1 = alloca i32, align 4
+  %2 = alloca float, align 4
+  %3 = alloca float, align 4
+  %4 = alloca float, align 4
+  store i32 0, i32* %1, align 4
+  call void @llvm.dbg.declare(metadata float* %2, metadata !13, metadata !DIExpression()), !dbg !15
+  call void @llvm.dbg.declare(metadata float* %3, metadata !16, metadata !DIExpression()), !dbg !17
+  call void @llvm.dbg.declare(metadata float* %4, metadata !18, metadata !DIExpression()), !dbg !19
+  %5 = call i32 (i8*, ...) @__isoc99_scanf(i8* getelementptr inbounds ([6 x i8], [6 x i8]* @.str, i32 0, i32 0), float* %2, float* %3), !dbg !20
+  %6 = load float, float* %2, align 4, !dbg !21
+  %7 = load float, float* %3, align 4, !dbg !22
+  %8 = fmul float %6, %7, !dbg !23
+  %9 = fdiv float %8, 2.000000e+00, !dbg !24
+  store float %9, float* %4, align 4, !dbg !25
+  %10 = load float, float* %4, align 4, !dbg !26
+  %11 = fcmp ogt float %10, 0.000000e+00, !dbg !28
+  br i1 %11, label %12, label %24, !dbg !29
+  %25 = load float, float* %2, align 4, !dbg !38
+  %26 = fpext float %25 to double, !dbg !38
+  %27 = load float, float* %3, align 4, !dbg !40
+  %28 = fpext float %27 to double, !dbg !40
+  %29 = load float, float* %2, align 4, !dbg !41
+  %30 = fpext float %29 to double, !dbg !41
+  %31 = load float, float* %3, align 4, !dbg !42
+  %32 = fpext float %31 to double, !dbg !42
+  %33 = load float, float* %4, align 4, !dbg !43
+  %34 = fmul float -1.000000e+00, %33, !dbg !44
+  %35 = fpext float %34 to double, !dbg !45
+  %36 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([55 x i8], [55 x i8]* @.str.1, i32 0, i32 0), double %26, double %28, double %30, double %32, double %35), !dbg !46
+  br label %37
+  ret i32 0, !dbg !44
+Exit::main
+===================================
