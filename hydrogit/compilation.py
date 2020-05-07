@@ -15,14 +15,14 @@ class CompileManager:
         self.tmp=tmp
         self.versions_built=[]
 
-    def build_all(self, force, verbose):
+    def build_all(self, force, verbose, cmake_dir, build_dir):
         '''
         Run compilation step for all versions.
         '''
 
         for version_path in Path(self.tmp).iterdir():
             if version_path.is_dir() and version_path.name!="cloned":
-                ver=Version(version_path, self.language)
+                ver=Version(version_path, self.language, cmake_dir, build_dir)
                 try:
                     ver.build(force, verbose)
                 except AssertionError as msg:
@@ -33,10 +33,11 @@ class CompileManager:
                 self.versions_built.append(ver)
 
 class Version:
-    def __init__(self, root, language):
+    def __init__(self, root, language, cmake_dir, build_dir):
         self.root=root
         self.version = self.root.stem
-        self.build_path = self.root / 'build'
+        self.build_path = self.root / build_dir
+        self.cmake_path = self.root / cmake_dir
         self.llvm_ir_path = self.build_path / 'llvm-ir'
         self.c_paths=[]
         self.bc_paths=[]

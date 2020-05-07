@@ -51,6 +51,22 @@ def get_args():
         default='C',
         )
         
+    parser.add_argument(
+        '-B',
+        '--build-dir',
+        dest='build_dir',
+        help='relative path from the project root to the desired build directory',
+        default='build',
+        )
+        
+    parser.add_argument(
+        '-C',
+        '--cmake-dir',
+        dest='cmake_dir',
+        help='relative path from the project root to the directory containing CMakeLists.txt',
+        default='.',
+        )
+        
     parser.add_argument('url')
     parser.add_argument('first_version')
     parser.add_argument('latter_versions', nargs='+')
