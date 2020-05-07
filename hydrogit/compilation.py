@@ -25,8 +25,8 @@ class CompileManager:
                 ver=Version(version_path, self.language, cmake_dir, build_dir)
                 try:
                     ver.build(force, verbose)
-                except AssertionError as msg:
-                    print(f'{ver.version}: Failed - Skipping ({msg})')
+                except Exception as msg:
+                    print(f'{ver.version}: Error({msg}) - skipping')
                     continue
 
                 print(f'{ver.version}: Built successfully')
@@ -48,8 +48,8 @@ class Version:
         self.setup_build_path(force)
 
         # Transform CMakeLists.txt
-        root_cmakelist = self.root / 'CMakeLists.txt'
-        assert root_cmakelist.exists(), 'CMakeLists.txt not found in project root'
+        root_cmakelist = self.cmake_path / 'CMakeLists.txt'
+        assert root_cmakelist.exists(), f'CMakeLists.txt not found in {str(root_cmakelist)}'
         self.transform_cmakelists(root_cmakelist)
 
         # Run CMake and collect the output
@@ -62,12 +62,12 @@ class Version:
 
     def setup_build_path(self, force):
         # Skip if built already unless we wanna HULK SMASH
-        if self.build_path.exists():
-            if force:
-                shutil.rmtree(self.build_path)
-            else:
-                print(f'Version {self.root} is already built, skipping')
-                return
+        # if self.build_path.exists():
+        #     if force:
+        #         shutil.rmtree(self.build_path)
+        #     else:
+        #         print(f'Version {self.root} is already built, skipping')
+        #         return
 
         self.build_path.mkdir(exist_ok=True)
     
@@ -116,7 +116,7 @@ get_directory_property(_allTargets BUILDSYSTEM_TARGETS)
 foreach(_target ${{_allTargets}})
     get_target_property(_type ${{_target}} TYPE)
     message(STATUS "Hydrogit saw target ${{_target}} type ${{_type}}")
-    if((_type STREQUAL "EXECUTABLE") OR (_type STREQUAL "STATIC_LIBRARY"))
+    if((_type STREQUAL "EXECUTABLE") OR (_type STREQUAL "STATIC_LIBRARY") OR (_type STREQUAL "SHARED_LIBRARY"))
         message(STATUS "Hydrogit adding IR for target ${{_target}} type ${{_type}}")
         set_target_properties(${{_target}} PROPERTIES LINKER_LANGUAGE C)
         add_compile_options(-c -O0 -Xclang -disable-O0-optnone -g -emit-llvm -S)
@@ -135,6 +135,9 @@ endforeach(_target ${{_allTargets}})
         Run CMake with the given target
         '''
 
+        stdout = None if verbose else subprocess.DEVNULL
+        stderr = None if verbose else subprocess.DEVNULL
+        
         compile_env = os.environ.copy()
         if self.language == 'C':
             compile_env['CC'] = 'clang'
@@ -144,15 +147,13 @@ endforeach(_target ${{_allTargets}})
         cmake_proc = subprocess.run(args=[
             'cmake',
             '-B', str(self.build_path),
-            str(self.root)
+            str(self.cmake_path)
         ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stdout=stdout,
+        stderr=stderr,
         text=True,
-        env=compile_env)
-            
-        if verbose:
-            print(cmake_proc.stdout)
+        env=compile_env
+        )
         
         assert cmake_proc.returncode == 0, \
             f'CMake step returned error code {cmake_proc.returncode}'
@@ -170,40 +171,41 @@ endforeach(_target ${{_allTargets}})
         return targets
 
     def make(self, targets, verbose):
-            for target in targets:
-                try:
-                    print(f'{self.version}: Building target {target}...', end='', flush=True)
+        for target in targets:
+            try:
+                print(f'{self.version}: Building target {target}...', end='', flush=True)
+                
+                args = [
+                    'cmake',
+                    '--build',
+                    str(self.build_path),
+                    '--target', target,
+                ]
+                if verbose:
+                    args.append('--verbose') # show make output
+                
+                stdout = None if verbose else subprocess.DEVNULL
+                stderr = None if verbose else subprocess.DEVNULL
                     
-                    args = [
-                        'cmake',
-                        '--build',
-                        str(self.build_path),
-                        '--target', target,
-                    ]
-                    if verbose:
-                        args.append('--verbose') # show make output
-                        
-                    build_proc = subprocess.run(
-                        args=args,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True)
-                    
-                    if verbose:
-                        print(build_proc.stdout)
+                build_proc = subprocess.run(
+                    args=args,
+                    stdout=stdout,
+                    stderr=stderr,
+                    text=True
+                    )
 
-                    assert build_proc.returncode == 0, \
-                        f'Build step returned error code {build_proc.returncode}'
-                    
-                    print('done')
-                except Exception as ex:
-                    # Print the newline & bubble if there's an error while processing
-                    print()
-                    raise ex
+                assert build_proc.returncode == 0, \
+                    f'Build step returned error code {build_proc.returncode}'
+                
+                print('done')
+            except Exception as ex:
+                # Print the newline & bubble if there's an error while processing
+                print()
+                print(f'{self.version}: {target}: Error({ex}) - skipping')
 
 def main():
     cm=CompileManager('C', Path("./tmp").absolute())
-    cm.build_all(True, True)
+    # cm.build_all(True, True)
 
 if __name__ == '__main__':
     main()
