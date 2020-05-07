@@ -17,20 +17,20 @@ def get_args():
     )
 
     parser.add_argument(
+        '-L',
+        '--local',
+        dest='local_dir',
+        action='store_true',
+        help='clone from a local dir',
+        default=False,
+        )
+
+    parser.add_argument(
         '-p',
         '--force-pull',
         dest='force_pull',
         action='store_true',
         help='remove existing versions and pull again',
-        default=False,
-        )
-
-    parser.add_argument(
-        '-b',
-        '--force-build',
-        dest='force_build',
-        action='store_true',
-        help='remove existing versions and build again',
         default=False,
         )
 
@@ -52,19 +52,11 @@ def get_args():
         )
         
     parser.add_argument(
-        '-B',
-        '--build-dir',
-        dest='build_dir',
-        help='relative path from the project root to the desired build directory',
-        default='build',
-        )
-        
-    parser.add_argument(
         '-C',
-        '--cmake-dir',
-        dest='cmake_dir',
-        help='relative path from the project root to the directory containing CMakeLists.txt',
-        default='.',
+        '--cmake',
+        dest='with_cmake',
+        help='build with CMake',
+        default=False,
         )
         
     parser.add_argument('url')
