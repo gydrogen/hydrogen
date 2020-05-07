@@ -7,6 +7,7 @@ import shutil
 
 cmake_utils_dir = (Path(__file__).parent / 'llvm-ir-cmake-utils' / 'cmake').resolve()
 assert cmake_utils_dir.exists()
+hydrogit_target_tag = '_hydrogit'
 
 class CompileManager:
     def __init__(self, language, tmp):
@@ -14,48 +15,59 @@ class CompileManager:
         self.tmp=tmp
         self.versions_built=[]
 
-    def build_all(self, force):
+    def build_all(self, force, verbose, cmake_dir, build_dir):
         '''
         Run compilation step for all versions.
         '''
 
         for version_path in Path(self.tmp).iterdir():
             if version_path.is_dir() and version_path.name!="cloned":
-                self.build_one(version_path, force)
+                ver=Version(version_path, self.language, cmake_dir, build_dir)
+                try:
+                    ver.build(force, verbose)
+                except Exception as msg:
+                    print(f'{ver.version}: Error({msg}) - skipping')
+                    continue
 
-    def build_one(self, version_path, force):
-        ver=Version(version_path, self.language)
-        ver.build(force)
-        self.versions_built.append(ver)
+                print(f'{ver.version}: Built successfully')
+                self.versions_built.append(ver)
 
 class Version:
-    def __init__(self, path, language):
-        self.path=path
-        self.build_path = self.path / 'build'
+    def __init__(self, root, language, cmake_dir, build_dir):
+        self.root=root
+        self.version = self.root.stem
+        self.build_path = self.root / build_dir
+        self.cmake_path = self.root / cmake_dir
+        self.llvm_ir_path = self.build_path / 'llvm-ir'
         self.c_paths=[]
-        self.bc_path=None
+        self.bc_paths=[]
         self.language = language
     
-    def build(self, force):
+    def build(self, force, verbose):
         # Set up build path
         self.setup_build_path(force)
 
         # Transform CMakeLists.txt
-        root_cmakelist = self.path / 'CMakeLists.txt'
-        llvmlink_target = self.transform_cmakelists(root_cmakelist)
+        root_cmakelist = self.cmake_path / 'CMakeLists.txt'
+        assert root_cmakelist.exists(), f'CMakeLists.txt not found in {str(root_cmakelist)}'
+        self.transform_cmakelists(root_cmakelist)
 
         # Run CMake and collect the output
-        self.cmake(llvmlink_target)
+        print(f'{self.version}: Running CMake...')
+        targets = self.cmake(verbose)
+        print(f'{self.version}: Building...')
+        self.make(targets, verbose)
+        print(f'{self.version}: Gathering files...')
         self.glob_files()
 
     def setup_build_path(self, force):
         # Skip if built already unless we wanna HULK SMASH
-        if self.build_path.exists():
-            if force:
-                shutil.rmtree(self.build_path)
-            else:
-                print(f'Version {self.path} is already built, skipping')
-                return
+        # if self.build_path.exists():
+        #     if force:
+        #         shutil.rmtree(self.build_path)
+        #     else:
+        #         print(f'Version {self.root} is already built, skipping')
+        #         return
 
         self.build_path.mkdir(exist_ok=True)
     
@@ -65,100 +77,135 @@ class Version:
         '''
         # gather C sources
         if self.language == 'C':
-            for p in (self.path).glob('*.c'):
+            for p in (self.root).glob('*.c'):
                 self.c_paths.append(p)
-            for p in (self.path / 'src').glob('**/*.c'):
+            for p in (self.root / 'src').glob('**/*.c'):
                 self.c_paths.append(p)
         
         # gather C++ sources
         elif self.language == 'CXX':
-            for p in (self.path).glob('*.cpp'):
+            for p in (self.root).glob('*.cpp'):
                 self.c_paths.append(p)
-            for p in (self.path / 'src').glob('**/*.cpp'):
+            for p in (self.root / 'src').glob('**/*.cpp'):
                 self.c_paths.append(p)
                 
-        assert len(self.c_paths) > 0
+        assert any(self.c_paths), \
+            f'No {self.language} sources found'
 
         # gather compiled bytecode
-        self.bc_path = next((self.path / 'build' / 'llvm-ir').glob('**/*_llvmlink.bc'))
-        assert self.bc_path
+        # todo: make it get all bc's
+        self.bc_paths = list(self.llvm_ir_path.glob(f'**/*{hydrogit_target_tag}.bc'))
+        assert any(self.bc_paths), \
+            f'CMake output not found in path {str(self.llvm_ir_path)}'
 
-    def transform_cmakelists(self, path):
+    def transform_cmakelists(self, cmakelists):
         '''
         Transform given CMakeLists.txt and return the llvmlink target name
         '''
 
-        assert path.exists()
+        assert cmakelists.exists(), \
+            f'CMakeLists.txt not found at path {str(cmakelists)}'
 
-        filecontents = ''
-        with path.open('r') as file:
-            # Find & replace target and project declarations
-            for line in file:
-                # Find target name
-                target_regex = r'add_executable\s*\(\s*([a-zA-Z0-9_]+)[^)]*\)'
-                target_match = re.search(target_regex, line)
-                if target_match:
-                    target = target_match.group(1)
+        with cmakelists.open('a') as file:        
+            ir_gen = f'''
+#{'='*10}LLVM IR generation
+list(APPEND CMAKE_MODULE_PATH "{cmake_utils_dir}")
+include(LLVMIRUtil)
+enable_language(C)
+get_directory_property(_allTargets BUILDSYSTEM_TARGETS)
+foreach(_target ${{_allTargets}})
+    get_target_property(_type ${{_target}} TYPE)
+    message(STATUS "Hydrogit saw target ${{_target}} type ${{_type}}")
+    if((_type STREQUAL "EXECUTABLE") OR (_type STREQUAL "STATIC_LIBRARY") OR (_type STREQUAL "SHARED_LIBRARY"))
+        message(STATUS "Hydrogit adding IR for target ${{_target}} type ${{_type}}")
+        set_target_properties(${{_target}} PROPERTIES LINKER_LANGUAGE C)
+        add_compile_options(-c -O0 -Xclang -disable-O0-optnone -g -emit-llvm -S)
+        llvmir_attach_bc_target(${{_target}}_bc ${{_target}})
+        add_dependencies(${{_target}}_bc ${{_target}})
+        llvmir_attach_link_target(${{_target}}{hydrogit_target_tag} ${{_target}}_bc -S)
+    endif()
+endforeach(_target ${{_allTargets}})
+# end LLVM IR generation
+#{'='*10}'''
 
-                # Replace project name
-                project_regex = r'project\s*\(\s*([a-zA-Z0-9_]+)[^)]*\)'
-                project_match = re.search(project_regex, line)
-                if project_match:
-                    project_name = project_match.group(1)
-                    line = re.sub(
-                        project_regex,
-                        f'project({project_name} C CXX)',
-                        line)
+            file.write(ir_gen)
 
-                filecontents += line
-            
-            # Add llvmlink target if a target was found in this file
-            if target:
-                llvmlink_target = f'{target}_llvmlink'
-                to_add = f'''
-    # LLVM-IR Generation
-    list(APPEND CMAKE_MODULE_PATH "{cmake_utils_dir}")
-    include(LLVMIRUtil)
-    set_target_properties({target} PROPERTIES LINKER_LANGUAGE {self.language})
-    add_compile_options(-c -O0 -Xclang -disable-O0-optnone -g -emit-llvm -S)
-    llvmir_attach_bc_target({target}_bc {target})
-    add_dependencies({target}_bc {target})
-    llvmir_attach_link_target({llvmlink_target} {target}_bc -S)
-                '''
-
-                filecontents += to_add
-
-        with path.open('w') as file:
-            file.write(filecontents)
-        
-        return llvmlink_target
-
-    def cmake(self, target):
+    def cmake(self, verbose):
         '''
         Run CMake with the given target
         '''
 
+        stdout = None if verbose else subprocess.DEVNULL
+        stderr = None if verbose else subprocess.DEVNULL
+        
         compile_env = os.environ.copy()
         if self.language == 'C':
             compile_env['CC'] = 'clang'
         elif self.language == 'CXX':
             compile_env['CXX'] = 'clang++'
-        subprocess.run(args=[
+        
+        cmake_proc = subprocess.run(args=[
             'cmake',
             '-B', str(self.build_path),
-            str(self.path)
-        ], env=compile_env)
-        subprocess.run(args=[
-            'cmake',
-            '--build',
-            str(self.build_path),
-            '--target', target,
-            # '--verbose' # Uncomment to show Make output
-        ], env=compile_env)
+            str(self.cmake_path)
+        ],
+        stdout=stdout,
+        stderr=stderr,
+        text=True,
+        env=compile_env
+        )
+        
+        assert cmake_proc.returncode == 0, \
+            f'CMake step returned error code {cmake_proc.returncode}'
+        assert self.llvm_ir_path.exists(), \
+            f'LLVM IR output directory {str(self.llvm_ir_path)} does not exist'
+
+        target_bcs = list(self.llvm_ir_path.glob(f'*{hydrogit_target_tag}'))
+        assert any(target_bcs), \
+            f'No CMake output found in path {str(self.llvm_ir_path)}'
+        for bc in target_bcs:
+            assert bc.exists(), \
+                f'CMake output not found for LLVM IR target {bc}'
+
+        targets = [bc.stem for bc in target_bcs]
+        return targets
+
+    def make(self, targets, verbose):
+        for target in targets:
+            try:
+                print(f'{self.version}: Building target {target}...', end='', flush=True)
+                
+                args = [
+                    'cmake',
+                    '--build',
+                    str(self.build_path),
+                    '--target', target,
+                ]
+                if verbose:
+                    args.append('--verbose') # show make output
+                
+                stdout = None if verbose else subprocess.DEVNULL
+                stderr = None if verbose else subprocess.DEVNULL
+                    
+                build_proc = subprocess.run(
+                    args=args,
+                    stdout=stdout,
+                    stderr=stderr,
+                    text=True
+                    )
+
+                assert build_proc.returncode == 0, \
+                    f'Build step returned error code {build_proc.returncode}'
+                
+                print('done')
+            except Exception as ex:
+                # Print the newline & bubble if there's an error while processing
+                print()
+                print(f'{self.version}: {target}: Error({ex}) - skipping')
 
 def main():
-    cm=CompileManager(Path("./tmp").absolute())
-    cm.build_all()
+    cm=CompileManager('C', Path("./tmp").absolute())
+    # cm.build_all(True, True)
 
 if __name__ == '__main__':
     main()
