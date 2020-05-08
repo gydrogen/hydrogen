@@ -167,11 +167,11 @@ pythontex-files-*/
 *.ttt
 *.fff
 
-# COMS513 :)
+# Hydrogit :)
 Result.txt
 MVICFG.dot
 __pycache__
 hydrogit/tmp
 build
 buildninja
-.vscode/.ropeproject
+.vscode

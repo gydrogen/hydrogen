@@ -2,9 +2,7 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 def get_args():
     example_usage = '''example:
-    python hydrogit.py \\
-        -l C \\
-        https://github.com/gydrogen/progolone.git \\
+    python hydrogit.py -vC https://github.com/gydrogen/progolone.git \\
         5e8651df381079d0347ddfa254f554972611d1a0 \\
         70d03532975252bd9982beba60a8720e11ec8f02 \\
         9cde7197d0a3fe0caf7ee0ec7fd291e19ccc18ed
@@ -17,20 +15,11 @@ def get_args():
     )
 
     parser.add_argument(
-        '-p',
-        '--force-pull',
-        dest='force_pull',
+        '-L',
+        '--local',
+        dest='local_dir',
         action='store_true',
-        help='remove existing versions and pull again',
-        default=False,
-        )
-
-    parser.add_argument(
-        '-b',
-        '--force-build',
-        dest='force_build',
-        action='store_true',
-        help='remove existing versions and build again',
+        help='clone from a local dir',
         default=False,
         )
 
@@ -52,19 +41,20 @@ def get_args():
         )
         
     parser.add_argument(
-        '-B',
-        '--build-dir',
-        dest='build_dir',
-        help='relative path from the project root to the desired build directory',
-        default='build',
+        '-C',
+        '--cmake',
+        dest='with_cmake',
+        action='store_true',
+        help='build with CMake',
+        default=False,
         )
         
     parser.add_argument(
-        '-C',
-        '--cmake-dir',
-        dest='cmake_dir',
-        help='relative path from the project root to the directory containing CMakeLists.txt',
-        default='.',
+        '-r',
+        '--rule',
+        dest='rule_name',
+        help='name of the Makefile rule to build',
+        default='',
         )
         
     parser.add_argument('url')
