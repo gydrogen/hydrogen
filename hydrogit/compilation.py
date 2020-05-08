@@ -45,8 +45,8 @@ class Version:
         assert root.exists()
         self.root = root
         self.version = self.root.stem
-        self.build_path = self.root / '.'
-        self.cmake_path = self.root / './build'
+        self.build_path = self.root / './build'
+        self.cmake_path = self.root / '.'
         self.llvm_ir_path = self.build_path / 'llvm-ir'
         self.c_paths = []
         self.bc_paths = []
@@ -104,7 +104,7 @@ class Version:
         assert filename, \
             f'no intermediate found in {self.root}'
 
-        outfile = f'{filename.parent/filename.stem[0:filename.stem.find(".")]}_{hydrogit_target_tag}.bc'
+        outfile = f'{filename.parent/filename.stem[0:filename.stem.find(".")]}{hydrogit_target_tag}.bc'
         llvmdis_proc = subprocess.run([
             'llvm-dis',
             filename,
@@ -139,14 +139,6 @@ class Version:
         self.glob_files()
 
     def setup_build_path(self):
-        # Skip if built already unless we wanna HULK SMASH
-        # if self.build_path.exists():
-        #     if force:
-        #         shutil.rmtree(self.build_path)
-        #     else:
-        #         print(f'Version {self.root} is already built, skipping')
-        #         return
-
         self.build_path.mkdir(exist_ok=True)
 
     def glob_files(self):
@@ -171,7 +163,7 @@ class Version:
             f'No {self.language} sources found'
 
         # gather compiled bytecode
-        self.bc_paths = list(self.root.glob(f'**/*_{hydrogit_target_tag}.bc'))
+        self.bc_paths = list(self.root.glob(f'**/*{hydrogit_target_tag}.bc'))
         assert any(self.bc_paths), \
             f'output bytecode not found in path {str(self.root)}'
 

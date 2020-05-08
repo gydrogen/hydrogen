@@ -2,9 +2,7 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 def get_args():
     example_usage = '''example:
-    python hydrogit.py \\
-        -l C \\
-        https://github.com/gydrogen/progolone.git \\
+    python hydrogit.py -vC https://github.com/gydrogen/progolone.git \\
         5e8651df381079d0347ddfa254f554972611d1a0 \\
         70d03532975252bd9982beba60a8720e11ec8f02 \\
         9cde7197d0a3fe0caf7ee0ec7fd291e19ccc18ed
@@ -46,6 +44,7 @@ def get_args():
         '-C',
         '--cmake',
         dest='with_cmake',
+        action='store_true',
         help='build with CMake',
         default=False,
         )
