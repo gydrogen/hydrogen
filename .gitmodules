@@ -1,3 +1,6 @@
 [submodule "hydrogit/llvm-ir-cmake-utils"]
 	path = hydrogit/llvm-ir-cmake-utils
 	url = https://github.com/compor/llvm-ir-cmake-utils.git
+[submodule "hydrogit/findutils"]
+	path = hydrogit/findutils
+	url = https://git.savannah.gnu.org/git/findutils.git
