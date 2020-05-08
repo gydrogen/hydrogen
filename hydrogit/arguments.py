@@ -26,15 +26,6 @@ def get_args():
         )
 
     parser.add_argument(
-        '-p',
-        '--force-pull',
-        dest='force_pull',
-        action='store_true',
-        help='remove existing versions and pull again',
-        default=False,
-        )
-
-    parser.add_argument(
         '-v',
         '--verbose',
         dest='verbose',
@@ -57,6 +48,14 @@ def get_args():
         dest='with_cmake',
         help='build with CMake',
         default=False,
+        )
+        
+    parser.add_argument(
+        '-r',
+        '--rule',
+        dest='rule_name',
+        help='name of the Makefile rule to build',
+        default='',
         )
         
     parser.add_argument('url')

@@ -17,79 +17,108 @@ class CompileManager:
         self.tmp = tmp
         self.versions_built = []
 
-    def build_all(self, verbose, cmake_dir, build_dir, with_cmake):
+    def build_all(self, verbose, with_cmake, rule):
         '''
         Run compilation step for all versions.
         '''
 
         for version_path in Path(self.tmp).iterdir():
             if version_path.is_dir() and version_path.name != "cloned":
-                ver = Version(version_path, self.language,
-                              cmake_dir, build_dir)
+                ver = Version(version_path, self.language)
                 try:
                     if with_cmake:
                         ver.build_cmake(verbose)
                     else:
-                        ver.build_make(verbose)
+                        ver.build_make(verbose, rule)
                 except Exception as msg:
                     print(f'{ver.version}: Error({msg}) - skipping')
                     continue
 
                 print(f'{ver.version}: Built successfully')
                 self.versions_built.append(ver)
+        assert len(self.versions_built) > 0, \
+            'No versions built'
 
 
 class Version:
-    def __init__(self, root, language, cmake_dir, build_dir):
+    def __init__(self, root, language):
         assert root.exists()
         self.root = root
         self.version = self.root.stem
-        self.build_path = self.root / build_dir
-        self.cmake_path = self.root / cmake_dir
+        self.build_path = self.root / '.'
+        self.cmake_path = self.root / './build'
         self.llvm_ir_path = self.build_path / 'llvm-ir'
         self.c_paths = []
         self.bc_paths = []
         self.language = language
 
-    def build_make(self, verbose):
-        # subprocess.run(['bash', 'bootstrap'], cwd=self.root)
+    def build_make(self, verbose, rule):
+        print('Hydrogit cleaning...')
+        subprocess.run(['rm', '*.bc'], 
+            stdout=None if verbose else subprocess.DEVNULL,
+            stderr=None if verbose else subprocess.DEVNULL,
+            cwd=self.root)
+        subprocess.run(['make', 'clean'], 
+            stdout=None if verbose else subprocess.DEVNULL,
+            stderr=None if verbose else subprocess.DEVNULL,
+            cwd=self.root)
+
+        print('Hydrogit configuring')
         configure_proc = subprocess.run(
-            ['bash', 'configure',
-            'CC=clang',
-            'CPPFLAGS=-c -O0 -Xclang -disable-O0-optnone -g -flto',
-            'LDFLAGS=-flto -fuse-ld=lld -Wl,-save-temps'],
+            ['bash', 'configure'],
             stdout=None if verbose else subprocess.DEVNULL,
             stderr=None if verbose else subprocess.DEVNULL,
             cwd=self.root
         )
 
-        # subprocess.run(['rm', '*.bc'], cwd=self.root)
-        # subprocess.run(['make', 'clean'], cwd=self.root)
+        assert configure_proc.returncode == 0, \
+            f'configure returned error code {configure_proc.returncode}'
+            
+        print('Hydrogit configuring again')
+        subprocess.run(['rm', '*.bc'], 
+            stdout=None if verbose else subprocess.DEVNULL,
+            stderr=None if verbose else subprocess.DEVNULL,
+            cwd=self.root)
+        subprocess.run(['make', 'clean'], 
+            stdout=None if verbose else subprocess.DEVNULL,
+            stderr=None if verbose else subprocess.DEVNULL,
+            cwd=self.root)
 
-        assert configure_proc.returncode == 0
-
+        print('Hydrogit running make')
         make_proc = subprocess.run([
             'make',
+            rule,
+            'CC=clang',
+            'CPPFLAGS=-O0 -Xclang -disable-O0-optnone -g -flto',
+            'LDFLAGS=-flto -fuse-ld=lld -Wl,-save-temps'
         ],
             stdout=None if verbose else subprocess.DEVNULL,
             stderr=None if verbose else subprocess.DEVNULL,
             cwd=self.root)
 
-        assert make_proc.returncode == 0
+        assert make_proc.returncode == 0, \
+            f'make returned error code {make_proc.returncode}'
 
         # Invoke llvm-dis
-        filename = next(self.root.glob('*.precodegen.bc'))
-        outfile = f'{filename.stem[0:filename.stem.find(".")]}{hydrogit_target_tag}.bc'
+        filename = next(self.root.glob('**/*.precodegen.bc'), None)
+        assert filename, \
+            f'no intermediate found in {self.root}'
+
+        outfile = f'{filename.parent/filename.stem[0:filename.stem.find(".")]}_{hydrogit_target_tag}.bc'
         llvmdis_proc = subprocess.run([
             'llvm-dis',
-            filename.name,
-            '-o', outfile
+            filename,
+            '-o',
+            outfile,
         ],
             stdout=None if verbose else subprocess.DEVNULL,
-            stderr=None if verbose else subprocess.DEVNULL,
-            cwd=self.root)
+            stderr=None if verbose else subprocess.DEVNULL)
 
-        assert llvmdis_proc.returncode == 0
+        assert llvmdis_proc.returncode == 0, \
+            f'llvm-dis returned error code {llvmdis_proc.returncode}'
+
+        print(f'{self.version}: Gathering files...')
+        self.glob_files()
 
     def build_cmake(self, verbose):
         # Set up build path
@@ -97,8 +126,8 @@ class Version:
 
         # Transform CMakeLists.txt
         root_cmakelist = self.cmake_path / 'CMakeLists.txt'
-        assert root_cmakelist.exists(
-        ), f'CMakeLists.txt not found in {str(root_cmakelist)}'
+        assert root_cmakelist.exists(), \
+            f'CMakeLists.txt not found in {str(root_cmakelist)}'
         self.transform_cmakelists(root_cmakelist)
 
         # Run CMake and collect the output
@@ -126,10 +155,10 @@ class Version:
         '''
         # gather C sources
         if self.language == 'C':
-            for p in (self.root).glob('*.c'):
+            for p in (self.root).glob('**/*.c'):
                 self.c_paths.append(p)
-            for p in (self.root / 'src').glob('**/*.c'):
-                self.c_paths.append(p)
+            # for p in (self.root / 'src').glob('**/*.c'):
+            #     self.c_paths.append(p)
 
         # gather C++ sources
         elif self.language == 'CXX':
@@ -142,9 +171,9 @@ class Version:
             f'No {self.language} sources found'
 
         # gather compiled bytecode
-        self.bc_paths = list(self.root.glob(f'**/*{hydrogit_target_tag}.bc'))
+        self.bc_paths = list(self.root.glob(f'**/*_{hydrogit_target_tag}.bc'))
         assert any(self.bc_paths), \
-            f'CMake output not found in path {str(self.root)}'
+            f'output bytecode not found in path {str(self.root)}'
 
     def transform_cmakelists(self, cmakelists):
         '''
@@ -250,11 +279,14 @@ endforeach(_target ${{_allTargets}})
             except Exception as ex:
                 # Print the newline & bubble if there's an error while processing
                 print()
-                print(f'{self.version}: {target}: Error({ex}) - skipping')
+                if str(ex):
+                    print(f'{self.version}: {target}: Error({ex}) - skipping')
+                else:
+                    raise ex
 
 
 def main():
-    v = Version(Path('./tmp/tut_prog copy'), 'C', '', '')
+    v = Version(Path('./tmp/7642d172e10a890975696d28278e5192d81afc5b'), 'C', '.', './build')
     v.build_make(True)
     v.glob_files()
     print(v.bc_paths)
