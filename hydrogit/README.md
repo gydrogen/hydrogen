@@ -61,6 +61,23 @@ Note running with the verbose(`-v`) flag slows down the program quite a bit.
 If a build fails, you must be running with `-v` to see the cause of the error.
 Examples of running the program are given in `USAGE.md`.
 
+### Referencing Hydrogen
+
+This project assumes it's in the root directory of Hydrogen and that Hydrogen is built in a folder named `buildninja`.
+Here's what the directory tree should look like:
+
+```
+hydrogen/
+|__hydrogit/
+|  |__hydrogit.py
+|  |__You are here!
+|  |__Other hydrogit files...
+|__buildninja/
+|  |__Hydrogen.out
+|  |__Other CMake files for Hydrogen...
+|__Other Hydrogen sources...
+```
+
 ### Command line options
 
 General options:
