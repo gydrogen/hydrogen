@@ -1,3 +1,0 @@
-main.o
--r=main.o,main,plx
--r=main.o,puts,
