@@ -12,19 +12,16 @@ class GitManager:
         self.current_cwd=os.getcwd()
         self.url = git_url
 
-    def clone(self, force, local_dir):
-        if self.tmp.exists() and not force:
-            print("The tmp project exists, will not clone")
+    def clone(self, local_dir):
+        if self.tmp.exists():
+            shutil.rmtree(self.tmp)
+        self.tmp.mkdir(exist_ok=True)
+        if local_dir:
+            local = Path(self.url)
+            assert local.exists()
+            shutil.copytree(str(local), str(self.cloned))
         else:
-            if self.tmp.exists():
-                shutil.rmtree(self.tmp)
-            self.tmp.mkdir(exist_ok=True)
-            if local_dir:
-                local = Path(self.url)
-                assert local.exists()
-                shutil.copytree(str(local), str(self.cloned))
-            else:
-                subprocess.run(["git", "clone", self.url, str(self.cloned)])
+            subprocess.run(["git", "clone", self.url, str(self.cloned)])
 
 
     def checkout_copy_versions(self, versions, force=False):
