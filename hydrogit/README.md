@@ -1,6 +1,6 @@
 # Hydrogit
 
-![splash](github.png)
+![splash](splash.png)
 
 Hydrogit is a wrapper around the Hydrogen tool that automates the process of pulling and building source code versions.
 Currently, CMake and GNU Automake/configure are supported.
