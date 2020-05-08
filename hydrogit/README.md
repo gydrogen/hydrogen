@@ -36,7 +36,8 @@ customization will have to happen offline.
 
 For findutils, we pulled the code and ran the `bootstrap` script because it takes a very long time
 to build otherwise (it crawls Savannah's git repositories to check which version of gnulibs it needs).
-The included `findutils` folder holds our version after having run `./bootstrap`.
+The included `findutils` folder references the commit we built against.
+To prepare it, follow the docs' instructions up until running `configure` and `make`, then Hydrogit will do the rest.
 
 ## Usage
 
