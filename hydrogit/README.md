@@ -45,7 +45,7 @@ The project was built using `Python 3.8`.
 All Python dependencies are in the Python standard library.
 
 `clang` is required to build CMake projects.
-`lld`, `llvm-dis`, and `clang` are required to build Autotools projects.
+`make`, `lld`, `llvm-dis`, and `clang` are required to build Autotools projects.
 And of course, these projects should build on their own on your system before Hydrogit can build them.
 
 To build CMake projects, Hydrogit depends on another project hosted on Github:
